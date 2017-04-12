@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -17,6 +16,7 @@ var (
 	orgLicences  int
 	orgPhone     string
 	orgPackage   string
+	orgTemplate  string
 )
 
 var importCmd = &cobra.Command{
@@ -39,6 +39,5 @@ func init() {
 	importCmd.PersistentFlags().IntVar(&orgLicences, "licences", 1, "Number of user licenses")
 	importCmd.PersistentFlags().StringVar(&orgPhone, "phone", "", "Phone number of organization")
 	importCmd.PersistentFlags().StringVar(&orgPackage, "package", "beginner", "PPE package. Must be one of beginner, business, advanced or professional.")
-	importCmd.PersistentFlags().String("template", "", "Template ID for organization creation")
-	viper.BindPFlag("template", importCmd.PersistentFlags().Lookup("template"))
+	importCmd.PersistentFlags().StringVar(&orgTemplate, "template", "", "Template ID for organization creation")
 }

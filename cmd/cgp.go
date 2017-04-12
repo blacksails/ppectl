@@ -53,19 +53,7 @@ var cgpCmd = &cobra.Command{
 		_, err = pp.Domain(orgDomain)
 		if _, ok := err.(ppe.UnauthorizedError); ok {
 			domainLogger.Warn("Domain does not exist on PPE.")
-			domainLogger.Info("Checking if we have required info to create new domain")
-			fmt.Printf("Name: %s\n", orgName)
-			fmt.Printf("Domain: %s\n", orgDomain)
-			fmt.Printf("Address: %s\n", orgAddr)
-			fmt.Printf("Zip: %s\n", orgAddr)
-			fmt.Printf("Country: %s\n", orgCountry)
-			fmt.Printf("Phone: %s\n", orgPhone)
-			fmt.Printf("Admin Firstname: %s\n", orgFirstName)
-			fmt.Printf("Admin Lastname: %s\n", orgLastName)
-			fmt.Printf("Admin Email: %s\n", orgEmail)
-			fmt.Printf("Package: %s\n", orgPackage)
-			fmt.Printf("Package Template ID: %s\n", viper.GetString("template"))
-			fmt.Printf("User Licences: %v\n", orgLicences)
+			domainLogger.Info("Checking if we have required info to create new domain...")
 			if orgName == "" {
 				domainLogger.Fatal("Organization name is required")
 			}
@@ -78,6 +66,33 @@ var cgpCmd = &cobra.Command{
 			if orgLicences < 1 {
 				domainLogger.Fatal("An organization must have at least 1 license")
 			}
+			domainLogger.Info("Successfully checked required info")
+			fmt.Printf("Name: %s\n", orgName)
+			fmt.Printf("Domain: %s\n", orgDomain)
+			fmt.Printf("Address: %s\n", orgAddr)
+			fmt.Printf("Zip: %s\n", orgAddr)
+			fmt.Printf("Country: %s\n", orgCountry)
+			fmt.Printf("Phone: %s\n", orgPhone)
+			fmt.Printf("Admin Firstname: %s\n", orgFirstName)
+			fmt.Printf("Admin Lastname: %s\n", orgLastName)
+			fmt.Printf("Admin Email: %s\n", orgEmail)
+			fmt.Printf("Package: %s\n", orgPackage)
+			if orgTemplate == "" {
+				// Fallback to a default template based on package
+				defTemplates := viper.GetStringMapString("default-templates")
+				switch orgPackage {
+				case "beginner", "":
+					orgTemplate = defTemplates["beginner"]
+				case "business":
+					orgTemplate = defTemplates["business"]
+				case "advanced":
+					orgTemplate = defTemplates["advanced"]
+				case "professional":
+					orgTemplate = defTemplates["professional"]
+				}
+			}
+			fmt.Printf("Package Template ID: %s\n", orgTemplate)
+			fmt.Printf("User Licences: %v\n", orgLicences)
 			if !askForConfirmation("Create organization with the above information?") {
 				domainLogger.Fatal("Aborting...")
 			}
@@ -108,7 +123,7 @@ var cgpCmd = &cobra.Command{
 				Country:           orgCountry,
 				Phone:             orgPhone,
 				LicencingPackage:  orgPackage,
-				AccountTemplateID: viper.GetString("template"),
+				AccountTemplateID: orgTemplate,
 			}
 			if err = apiOrg.CreateOrganization(newOrg); err != nil {
 				log.WithField("error", err).Fatal("Error creating organization")
@@ -176,7 +191,7 @@ var cgpCmd = &cobra.Command{
 			if !ok {
 				continue // Skip domain
 			}
-			log.WithField("domain", dom).Info("Creating domain...")
+			log.WithField("domain", dom).Info("Creating domain")
 			newDom := ppe.NewDomain{
 				DomainName:  dom,
 				Destination: viper.GetString("cgp-base"),
