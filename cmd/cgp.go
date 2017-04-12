@@ -205,8 +205,50 @@ var cgpCmd = &cobra.Command{
 		}
 
 		// - Gather list of accounts that should be present on PPE
+		domainLogger.Info("Fetching PPE accounts")
+		cgpAccs, err := cg.Domain(orgDomain).Accounts()
+		if err != nil {
+			log.WithField("error", err).Fatal("Error when fetching accounts from CGP")
+		}
+		domainLogger.Info("Succesfully fetched CGP accounts")
+
 		// - Gather list of accounts actually on PPE
-		// - Add missing accounts
+		domainLogger.Info("Fetching PPE accounts")
+		ppeAccs, err := ppeOrg.Users()
+		if err != nil {
+			log.WithField("error", err).Fatal("Error when fetching accounts from PPE")
+		}
+		domainLogger.Info("Successfully fetched PPE accounts")
+
+		// Compare lists of fetch accounts, add accounts.
+		var missingAccs []*cgp.Account
+		for _, cgpA := range cgpAccs {
+			found := false
+			for _, ppeA := range ppeAccs {
+				if cgpA.Email() == ppeA.Email {
+					found = true
+					break
+				}
+			}
+			accLogger := log.WithField("account", cgpA.Email())
+			if !found {
+				accLogger.Info("Account missing on PPE")
+				missingAccs = append(missingAccs, cgpA)
+			} else {
+				accLogger.Info("Account exists on PPE")
+			}
+		}
+		for _, acc := range missingAccs {
+			accLogger := log.WithField("account", acc.Email())
+			accLogger.Info("Creating account")
+			err := ppeOrg.CreateUser(ppe.NewUser{PrimaryEmail: acc.Email()})
+			if err != nil {
+				log.WithField("error", err).Fatal("Error when trying to create account")
+			}
+			accLogger.Info("Successfully created account")
+		}
+
+		// For each account compare list of aliases
 	},
 }
 

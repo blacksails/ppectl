@@ -1,8 +1,8 @@
 hash: a4aa96f04755a3775f8181c87458d68f788308be9b09af86ce7c003bd9ffadb5
-updated: 2017-04-12T15:41:30.785557129+02:00
+updated: 2017-04-12T15:56:34.706978155+02:00
 imports:
 - name: github.com/blacksails/cgp
-  version: 9188178942d0489867a52a53fc9403dfa0135a64
+  version: caaeb47c1c926db997f4709cf0b272fbfd041a0f
 - name: github.com/blacksails/ppe
   version: e761120e81645eff58c48d8ae9b4b86255471af9
 - name: github.com/fsnotify/fsnotify
