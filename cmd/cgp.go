@@ -107,7 +107,7 @@ var cgpCmd = &cobra.Command{
 				Postcode:          orgZip,
 				Country:           orgCountry,
 				Phone:             orgPhone,
-				LicensingPackage:  orgPackage,
+				LicencingPackage:  orgPackage,
 				AccountTemplateID: viper.GetString("template"),
 			}
 			if err = apiOrg.CreateOrganization(newOrg); err != nil {
