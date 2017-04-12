@@ -1,0 +1,6 @@
+package: github.com/blacksails/ppectl
+import:
+- package: github.com/blacksails/cgp
+- package: github.com/blacksails/ppe
+- package: github.com/spf13/cobra
+- package: github.com/spf13/viper
