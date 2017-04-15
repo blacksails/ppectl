@@ -308,6 +308,74 @@ var cgpCmd = &cobra.Command{
 				accLogger.Info("Aliases are already fully synced")
 			}
 		}
+
+		// Add forwarders as normal accounts
+		domainLogger.Info("Fetching CGP forwarders")
+		cgpFws, err := cg.Domain(orgDomain).Forwarders()
+		if err != nil {
+			domainLogger.WithError(err).Fatal("Error when fetching CGP forwarders")
+		}
+		domainLogger.Info("Successfully fetched forwarders")
+		for _, cgpFw := range cgpFws {
+			fwLogger := domainLogger.WithField("forwarder", cgpFw.Name)
+			// Check if forwarder already exists
+			found := false
+			for _, ppeA := range ppeAccs {
+				if cgpFw.Email() == ppeA.Email {
+					found = true
+					break
+				}
+			}
+			if found {
+				fwLogger.Info("Creating PPE account for forwarder")
+				err := ppeOrg.CreateUser(ppe.NewUser{PrimaryEmail: cgpFw.Email()})
+				if err != nil {
+					fwLogger.WithError(err).Fatal("Error when creating user for forwarder")
+				}
+				fwLogger.Info("Successfully created PPE user for forwarder")
+			} else {
+				fwLogger.Info("PPE user for forwarder already exists")
+			}
+
+			fwLogger.Info("Fetching PPE user for forwarder")
+			ppeAcc, err := ppeOrg.User(cgpFw.Email())
+			if err != nil {
+				fwLogger.WithError(err).Fatal("Error when fetching PPE user for forwarder")
+			}
+			fwLogger.Info("Successfully fetched PPE user for forwarder")
+
+			aliases := make([]string, 0)
+			for _, ppeD := range ppeDoms {
+				if ppeD.Name == cgpFw.Domain.Name {
+					continue // This is the primary email so no need to create an alias
+				}
+				aliases = append(aliases, fmt.Sprintf("%s@%s", cgpFw.Name, ppeD.Name))
+			}
+			syncNeeded := false
+			for _, ali := range aliases {
+				found := false
+				for _, ppeAli := range ppeAcc.Aliases {
+					if ali == ppeAli {
+						found = true
+					}
+				}
+				if !found {
+					syncNeeded = true
+				}
+			}
+			if syncNeeded {
+				fwLogger.Info("Found missing user alias(es). Starting syncronization")
+				uc := ppe.UserChange{PrimaryEmail: cgpFw.Email(), AliasEmails: aliases}
+				err = ppeOrg.UpdateUser(uc)
+				if err != nil {
+					fwLogger.WithField("aliases", aliases).WithError(err).Fatal("Error updating PPE user aliases")
+				}
+				fwLogger.WithField("aliases", aliases).Info("Successfully updated PPE user")
+			}
+		}
+
+		// TODO: Add groups as functional accounts
+		// TODO: Add mailing lists as functional accounts
 	},
 }
 
