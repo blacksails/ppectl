@@ -204,7 +204,7 @@ var cgpCmd = &cobra.Command{
 			log.WithField("domain", dom).Info("Successfully created domain")
 		}
 
-		// - Gather list of accounts that should be present on PPE
+		// Gather list of accounts that should be present on PPE
 		domainLogger.Info("Fetching PPE accounts")
 		cgpAccs, err := cg.Domain(orgDomain).Accounts()
 		if err != nil {
@@ -212,7 +212,7 @@ var cgpCmd = &cobra.Command{
 		}
 		domainLogger.Info("Succesfully fetched CGP accounts")
 
-		// - Gather list of accounts actually on PPE
+		// Gather list of accounts actually on PPE
 		domainLogger.Info("Fetching PPE accounts")
 		ppeAccs, err := ppeOrg.Users()
 		if err != nil {
@@ -220,9 +220,18 @@ var cgpCmd = &cobra.Command{
 		}
 		domainLogger.Info("Successfully fetched PPE accounts")
 
+		// Gather list of PPE domains
+		domainLogger.Info("Fetching PPE domains")
+		ppeDoms, err = ppeOrg.Domains()
+		if err != nil {
+			log.WithError(err).Fatal("Error when fetching domains from PPE")
+		}
+		domainLogger.Info("Successfully fetched PPE domains")
+
 		// Compare lists of fetch accounts, add accounts.
-		var missingAccs []*cgp.Account
 		for _, cgpA := range cgpAccs {
+
+			// Check if account is missing
 			found := false
 			for _, ppeA := range ppeAccs {
 				if cgpA.Email() == ppeA.Email {
@@ -232,23 +241,73 @@ var cgpCmd = &cobra.Command{
 			}
 			accLogger := log.WithField("account", cgpA.Email())
 			if !found {
-				accLogger.Info("Account missing on PPE")
-				missingAccs = append(missingAccs, cgpA)
+				// Create account if missing
+				accLogger.Info("Creating account")
+				err := ppeOrg.CreateUser(ppe.NewUser{PrimaryEmail: cgpA.Email()})
+				if err != nil {
+					log.WithField("error", err).Fatal("Error when trying to create account")
+				}
+				accLogger.Info("Successfully created account")
 			} else {
-				accLogger.Info("Account exists on PPE")
+				accLogger.Info("Account already exists on PPE")
 			}
-		}
-		for _, acc := range missingAccs {
-			accLogger := log.WithField("account", acc.Email())
-			accLogger.Info("Creating account")
-			err := ppeOrg.CreateUser(ppe.NewUser{PrimaryEmail: acc.Email()})
-			if err != nil {
-				log.WithField("error", err).Fatal("Error when trying to create account")
-			}
-			accLogger.Info("Successfully created account")
-		}
 
-		// For each account compare list of aliases
+			// Check if account has registered the correct aliases
+			accLogger.Info("Fetching CGP account aliases")
+			cgpAlis, err := cgpA.Aliases()
+			if err != nil {
+				log.WithFields(log.Fields{
+					"account": cgpA.Email(),
+					"error":   err,
+				}).Fatal("Error fetching account CGP aliases")
+			}
+			accLogger.Info("Successfully fetched CGP account aliases")
+			accLogger.Info("Fetching PPE account")
+			ppeAcc, err := ppeOrg.User(cgpA.Email())
+			if err != nil {
+				log.WithFields(log.Fields{
+					"account": cgpA.Email(),
+					"error":   err,
+				}).Fatal("Error fetching PPE account")
+			}
+			accLogger.Info("Successfully fetched PPE account")
+			aliStatuses := make(map[string]int, len(cgpAlis))
+			aliases := make([]string, 0)
+			for _, ppeD := range ppeDoms {
+				for _, cgpAli := range cgpAlis {
+					ali := fmt.Sprintf("%s@%s", cgpAli.Name, ppeD.Name)
+					aliStatuses[ali] = aliStatuses[ali] + 1
+					aliases = append(aliases, ali)
+				}
+			}
+			for _, ppeAli := range ppeAcc.Aliases {
+				aliStatuses[ppeAli] = aliStatuses[ppeAli] + 2
+			}
+			syncNeeded := false
+			for _, v := range aliStatuses {
+				if v != 3 {
+					syncNeeded = true
+					break
+				}
+			}
+
+			// Sync account aliases if needed
+			if syncNeeded {
+				accLogger.Info("Found unsynced account aliases. Starting syncronization")
+				uc := ppe.UserChange{PrimaryEmail: cgpA.Email(), AliasEmails: aliases}
+				err = ppeOrg.UpdateUser(uc)
+				if err != nil {
+					log.WithFields(log.Fields{
+						"error":   err,
+						"account": cgpA.Email(),
+						"aliases": aliases,
+					}).Fatal("Error when updating account aliases")
+				}
+				accLogger.Info("Successfully updated account aliases")
+			} else {
+				accLogger.Info("Aliases are already fully synced")
+			}
+		}
 	},
 }
 
